@@ -24,7 +24,7 @@
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "devvit": "0.13.0",
-    "hono": "4.12.21",
+    "hono": "4.12.23",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
