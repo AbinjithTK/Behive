@@ -7,33 +7,40 @@ export const api = new Hono();
  * GET /api/alignment — Dashboard overview data
  */
 api.get('/alignment', async (c) => {
-  const subreddit = await reddit.getCurrentSubreddit();
-  const data = await redis.hGetAll(`alignment:${subreddit.name}`);
-  return c.json(data || { overallScore: '0', status: 'learning', totalDecisions: '0' });
+  try {
+    const subreddit = await reddit.getCurrentSubreddit();
+    const data = await redis.hGetAll(`alignment:${subreddit.name}`);
+    return c.json(data || { overallScore: '0', status: 'learning', totalDecisions: '0' });
+  } catch {
+    return c.json({ overallScore: '0', status: 'learning', totalDecisions: '0' });
+  }
 });
 
 /**
  * GET /api/team — Mod team profiles
  */
 api.get('/team', async (c) => {
-  const subreddit = await reddit.getCurrentSubreddit();
-  const modList = await redis.hGetAll(`modlist:${subreddit.name}`);
-  const profiles: any[] = [];
+  try {
+    const subreddit = await reddit.getCurrentSubreddit();
+    const modList = await redis.hGetAll(`modlist:${subreddit.name}`);
+    const profiles: any[] = [];
 
-  if (modList) {
-    for (const username of Object.keys(modList)) {
-      try {
-        const profile = await redis.hGetAll(`modprofile:${subreddit.name}:${username}`);
-        if (profile) {
-          profiles.push({ username, ...profile });
-        }
-      } catch { /* skip */ }
+    if (modList) {
+      for (const username of Object.keys(modList)) {
+        try {
+          const profile = await redis.hGetAll(`modprofile:${subreddit.name}:${username}`);
+          if (profile) {
+            profiles.push({ username, ...profile });
+          }
+        } catch { /* skip */ }
+      }
     }
-  }
 
-  // Sort by total actions descending
-  profiles.sort((a, b) => parseInt(b.totalActions || '0') - parseInt(a.totalActions || '0'));
-  return c.json({ team: profiles });
+    profiles.sort((a, b) => parseInt(b.totalActions || '0') - parseInt(a.totalActions || '0'));
+    return c.json({ team: profiles });
+  } catch {
+    return c.json({ team: [] });
+  }
 });
 
 /**
@@ -128,29 +135,37 @@ api.get('/rules', async (c) => {
  * GET /api/streak — Alignment streak (days above target)
  */
 api.get('/streak', async (c) => {
-  const subreddit = await reddit.getCurrentSubreddit();
-  const streakStr = await redis.get(`streak:${subreddit.name}`);
-  return c.json({ streak: parseInt(streakStr || '0') });
+  try {
+    const subreddit = await reddit.getCurrentSubreddit();
+    const streakStr = await redis.get(`streak:${subreddit.name}`);
+    return c.json({ streak: parseInt(streakStr || '0') });
+  } catch {
+    return c.json({ streak: 0 });
+  }
 });
 
 /**
  * GET /api/stats — Summary stats for the dashboard header
  */
 api.get('/stats', async (c) => {
-  const subreddit = await reddit.getCurrentSubreddit();
-  const name = subreddit.name;
+  try {
+    const subreddit = await reddit.getCurrentSubreddit();
+    const name = subreddit.name;
 
-  const alignment = await redis.hGetAll(`alignment:${name}`);
-  const calCount = await redis.get(`calibration-count:${name}`);
-  const modList = await redis.hGetAll(`modlist:${name}`);
-  const streak = await redis.get(`streak:${name}`);
+    const alignment = await redis.hGetAll(`alignment:${name}`);
+    const calCount = await redis.get(`calibration-count:${name}`);
+    const modList = await redis.hGetAll(`modlist:${name}`);
+    const streak = await redis.get(`streak:${name}`);
 
-  return c.json({
-    alignmentScore: alignment?.overallScore || '0',
-    status: alignment?.status || 'learning',
-    totalDecisions: alignment?.totalDecisions || '0',
-    modCount: modList ? Object.keys(modList).length : 0,
-    calibrationCount: calCount || '0',
-    streak: streak || '0',
-  });
+    return c.json({
+      alignmentScore: alignment?.overallScore || '0',
+      status: alignment?.status || 'learning',
+      totalDecisions: alignment?.totalDecisions || '0',
+      modCount: modList ? Object.keys(modList).length : 0,
+      calibrationCount: calCount || '0',
+      streak: streak || '0',
+    });
+  } catch {
+    return c.json({ alignmentScore: '0', status: 'learning', totalDecisions: '0', modCount: 0, calibrationCount: '0', streak: '0' });
+  }
 });

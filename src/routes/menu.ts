@@ -158,41 +158,47 @@ menu.post('/show-precedent', async (c) => {
  * Flag for Calibration
  */
 menu.post('/flag-calibration', async (c) => {
-  const input = await c.req.json<MenuRequest>();
-  const targetId = input.targetId;
+  try {
+    const input = await c.req.json<MenuRequest>();
+    const targetId = input.targetId;
 
-  if (!targetId) {
-    return c.json<UiResponse>({ showToast: 'No content selected.' });
+    if (!targetId) {
+      return c.json<UiResponse>({ showToast: 'No content selected.' });
+    }
+
+    const subreddit = await reddit.getCurrentSubreddit();
+    const subredditName = subreddit.name;
+    const username = await reddit.getCurrentUsername() || 'unknown';
+
+    const flagId = `flag-${Date.now()}`;
+    await redis.hSet(`calibration:${subredditName}:${flagId}`, {
+      contentId: targetId,
+      flaggedBy: username,
+      timestamp: String(Date.now()),
+      resolved: 'false',
+      type: 'manual',
+    });
+    await redis.expire(`calibration:${subredditName}:${flagId}`, 30 * 24 * 60 * 60);
+    await redis.incrBy(`calibration-count:${subredditName}`, 1);
+
+    return c.json<UiResponse>({
+      showToast: '🚩 Flagged for team calibration. Your team will see this in the dashboard.',
+    });
+  } catch (e) {
+    console.error('[BeHive] Flag calibration error:', e);
+    return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' });
   }
-
-  const subreddit = await reddit.getCurrentSubreddit();
-  const subredditName = subreddit.name;
-  const username = await reddit.getCurrentUsername() || 'unknown';
-
-  const flagId = `flag-${Date.now()}`;
-  await redis.hSet(`calibration:${subredditName}:${flagId}`, {
-    contentId: targetId,
-    flaggedBy: username,
-    timestamp: String(Date.now()),
-    resolved: 'false',
-    type: 'manual',
-  });
-  await redis.expire(`calibration:${subredditName}:${flagId}`, 30 * 24 * 60 * 60);
-  await redis.incrBy(`calibration-count:${subredditName}`, 1);
-
-  return c.json<UiResponse>({
-    showToast: '🚩 Flagged for team calibration. Your team will see this in the dashboard.',
-  });
 });
 
 /**
  * View Team Alignment — Rich form with stats
  */
 menu.post('/view-alignment', async (c) => {
-  await c.req.json<MenuRequest>();
+  try {
+    await c.req.json<MenuRequest>();
 
-  const subreddit = await reddit.getCurrentSubreddit();
-  const subredditName = subreddit.name;
+    const subreddit = await reddit.getCurrentSubreddit();
+    const subredditName = subreddit.name;
 
   const alignment = await redis.hGetAll(`alignment:${subredditName}`);
   const calCount = await redis.get(`calibration-count:${subredditName}`);
@@ -258,6 +264,10 @@ menu.post('/view-alignment', async (c) => {
       },
     },
   });
+  } catch (e) {
+    console.error('[BeHive] View alignment error:', e);
+    return c.json<UiResponse>({ showToast: 'Could not load alignment data. Try again.' });
+  }
 });
 
 /**

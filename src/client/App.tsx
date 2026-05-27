@@ -135,9 +135,17 @@ function OverviewTab({ alignment, team, calibrations, streak }: {
           <div style={styles.cardIcon}>🌱</div>
           <h2 style={styles.cardTitle}>BeHive is Learning</h2>
           <p style={styles.cardText}>
-            Keep moderating! BeHive needs at least 10 decisions to calculate your team's alignment score.
-            Currently tracking {totalDecisions} decisions from {team.length} mods.
+            BeHive watches every approve, remove, and ban your team makes.
+            After 10+ decisions, it starts showing patterns.
           </p>
+          <div style={{...styles.cardText, marginTop: '12px', textAlign: 'left' as const, background: '#1a1a2e', padding: '12px', borderRadius: '8px', fontSize: '13px'}}>
+            <strong style={{color: '#4ecdc4'}}>How to use BeHive:</strong><br/><br/>
+            1. Moderate normally (approve/remove posts)<br/>
+            2. Right-click any post → "See Team Precedent"<br/>
+            3. Check this dashboard for your alignment score<br/>
+            4. Watch for disagreement alerts between mods<br/><br/>
+            <em>Currently: {totalDecisions} decisions from {team.length} mods</em>
+          </div>
         </div>
       ) : (
         <>

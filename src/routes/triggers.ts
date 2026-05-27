@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { redis } from '@devvit/web/server';
+import { redis, reddit } from '@devvit/web/server';
 import type { TriggerResponse } from '@devvit/web/shared';
 import { generateFingerprint, TRACKABLE_ACTIONS, normalizeAction } from '../core/hivemind';
 
@@ -10,19 +10,20 @@ export const triggers = new Hono();
  * Records every mod decision as team knowledge.
  */
 triggers.post('/on-mod-action', async (c) => {
-  const input = await c.req.json<{
-    moderator?: { name?: string };
-    action?: string;
-    target?: { id?: string; body?: string; title?: string; author?: string };
-    subreddit?: { name?: string };
-  }>();
+  try {
+    const input = await c.req.json<{
+      moderator?: { name?: string };
+      action?: string;
+      target?: { id?: string; body?: string; title?: string; author?: string };
+      subreddit?: { name?: string };
+    }>();
 
-  const moderator = input.moderator?.name;
-  const action = input.action;
+    const moderator = input.moderator?.name;
+    const action = input.action;
 
-  if (!moderator || !action) return c.json<TriggerResponse>({ status: 'ignored' });
-  if (!TRACKABLE_ACTIONS.includes(action)) return c.json<TriggerResponse>({ status: 'ignored' });
-  if (moderator === 'be-hive') return c.json<TriggerResponse>({ status: 'ignored' });
+    if (!moderator || !action) return c.json<TriggerResponse>({ status: 'ignored' });
+    if (!TRACKABLE_ACTIONS.includes(action)) return c.json<TriggerResponse>({ status: 'ignored' });
+    if (moderator === 'be-hive') return c.json<TriggerResponse>({ status: 'ignored' });
 
   const target = input.target;
   const subredditName = input.subreddit?.name || 'unknown';
@@ -91,6 +92,10 @@ triggers.post('/on-mod-action', async (c) => {
 
   console.log(`[BeHive] Recorded: ${moderator} → ${normalized} on ${contentType}`);
   return c.json<TriggerResponse>({ status: 'ok' });
+  } catch (e) {
+    console.error('[BeHive] onModAction error:', e);
+    return c.json<TriggerResponse>({ status: 'ok' });
+  }
 });
 
 triggers.post('/on-app-install', async (c) => {
@@ -98,12 +103,28 @@ triggers.post('/on-app-install', async (c) => {
   const subredditName = input.subreddit?.name;
   if (!subredditName) return c.json<TriggerResponse>({ status: 'ignored' });
 
-  await redis.hSet(`alignment:${subredditName}`, {
-    overallScore: '0',
-    status: 'learning',
-    lastComputed: String(Date.now()),
-  });
-  console.log(`[BeHive] Installed on r/${subredditName}`);
+  try {
+    // Initialize alignment tracking
+    await redis.hSet(`alignment:${subredditName}`, {
+      overallScore: '0',
+      status: 'learning',
+      lastComputed: String(Date.now()),
+      totalDecisions: '0',
+    });
+
+    // Auto-create the dashboard post so mods see it immediately
+    await reddit.submitCustomPost({
+      subredditName,
+      title: '🐝 BeHive — Team Alignment Dashboard',
+      entry: 'default',
+      textFallback: { text: `# 🐝 BeHive — Collective Intelligence for Mod Teams\n\nBeHive learns how your mod team thinks by watching every approve, remove, and ban.\n\n## How to use:\n1. **Moderate normally** — every action teaches BeHive\n2. **Right-click any post/comment** → "See Team Precedent" to see how your team handled similar content\n3. **Check this dashboard** for your alignment score and calibration moments\n4. **Flag edge cases** → "Flag for Calibration" when you're unsure\n\n## What you'll see:\n- **Alignment Score** — how consistently your team makes decisions (0-100%)\n- **Calibration Moments** — when two mods disagree on similar content\n- **Mod Profiles** — each mod's action patterns\n- **Rule Interpretations** — AI summaries of how your team applies each rule (optional)\n\nBeHive gets smarter with every decision. Pin this post to keep it visible for your team!` },
+    });
+
+    console.log(`[BeHive] Installed on r/${subredditName} — dashboard created`);
+  } catch (e) {
+    console.error('[BeHive] Install error:', e);
+  }
+
   return c.json<TriggerResponse>({ status: 'ok' });
 });
 
