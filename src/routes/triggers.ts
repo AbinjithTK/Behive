@@ -135,3 +135,150 @@ triggers.post('/on-post-delete', async (c) => {
 triggers.post('/on-comment-delete', async (c) => {
   return c.json<TriggerResponse>({ status: 'ok' });
 });
+
+/**
+ * onPostReport — Proactive Precedent
+ * When a post is reported, automatically check precedent and add a mod note
+ * so the reviewing mod sees team history WITHOUT needing to right-click.
+ */
+triggers.post('/on-post-report', async (c) => {
+  try {
+    const input = await c.req.json<{
+      post?: { id?: string; title?: string; selftext?: string };
+      subreddit?: { name?: string };
+      reason?: string;
+    }>();
+
+    const postId = input.post?.id;
+    const subredditName = input.subreddit?.name;
+    if (!postId || !subredditName) return c.json<TriggerResponse>({ status: 'ignored' });
+
+    const contentText = `${input.post?.title || ''} ${input.post?.selftext || ''}`;
+    if (contentText.length < 10) return c.json<TriggerResponse>({ status: 'ignored' });
+
+    const fingerprint = generateFingerprint(contentText);
+    if (fingerprint === 'empty') return c.json<TriggerResponse>({ status: 'ignored' });
+
+    // Find precedent
+    const allFingerprints = await redis.zRange(`fingerprints:${subredditName}`, 0, Date.now(), { by: 'score' });
+
+    let removeCount = 0;
+    let approveCount = 0;
+    let total = 0;
+
+    for (const entry of allFingerprints) {
+      const parts = entry.member.split(':');
+      const fp = parts[1] || '';
+      const decId = parts[0] || '';
+      if (fp !== fingerprint) continue;
+
+      try {
+        const decision = await redis.hGetAll(`decision:${subredditName}:${decId}`);
+        if (decision && decision.action) {
+          if (decision.action === 'remove') removeCount++;
+          else if (decision.action === 'approve') approveCount++;
+          total++;
+        }
+      } catch { /* skip */ }
+      if (total >= 5) break;
+    }
+
+    // Only add note if we have meaningful precedent
+    if (total >= 2) {
+      const verdict = removeCount > approveCount
+        ? `Team removed ${removeCount}/${total} similar`
+        : approveCount > removeCount
+        ? `Team approved ${approveCount}/${total} similar`
+        : `Split: ${removeCount} removed, ${approveCount} approved`;
+
+      try {
+        await reddit.addModNote({
+          subreddit: subredditName,
+          user: input.post?.title ? 'be-hive' : 'be-hive',
+          note: `🐝 BeHive Precedent: ${verdict}. Report reason: ${input.reason || 'none'}`,
+          label: 'HELPFUL_USER',
+          redditId: postId as `t3_${string}`,
+        });
+      } catch {
+        // ModNote API may not be available in all contexts — non-blocking
+        console.log(`[BeHive] Could not add mod note for ${postId}`);
+      }
+    }
+
+    return c.json<TriggerResponse>({ status: 'ok' });
+  } catch (e) {
+    console.error('[BeHive] onPostReport error:', e);
+    return c.json<TriggerResponse>({ status: 'ok' });
+  }
+});
+
+/**
+ * onCommentReport — Same as post report but for comments
+ */
+triggers.post('/on-comment-report', async (c) => {
+  try {
+    const input = await c.req.json<{
+      comment?: { id?: string; body?: string };
+      subreddit?: { name?: string };
+      reason?: string;
+    }>();
+
+    const commentId = input.comment?.id;
+    const subredditName = input.subreddit?.name;
+    if (!commentId || !subredditName) return c.json<TriggerResponse>({ status: 'ignored' });
+
+    const contentText = input.comment?.body || '';
+    if (contentText.length < 10) return c.json<TriggerResponse>({ status: 'ignored' });
+
+    const fingerprint = generateFingerprint(contentText);
+    if (fingerprint === 'empty') return c.json<TriggerResponse>({ status: 'ignored' });
+
+    const allFingerprints = await redis.zRange(`fingerprints:${subredditName}`, 0, Date.now(), { by: 'score' });
+
+    let removeCount = 0;
+    let approveCount = 0;
+    let total = 0;
+
+    for (const entry of allFingerprints) {
+      const parts = entry.member.split(':');
+      const fp = parts[1] || '';
+      const decId = parts[0] || '';
+      if (fp !== fingerprint) continue;
+
+      try {
+        const decision = await redis.hGetAll(`decision:${subredditName}:${decId}`);
+        if (decision && decision.action) {
+          if (decision.action === 'remove') removeCount++;
+          else if (decision.action === 'approve') approveCount++;
+          total++;
+        }
+      } catch { /* skip */ }
+      if (total >= 5) break;
+    }
+
+    if (total >= 2) {
+      const verdict = removeCount > approveCount
+        ? `Team removed ${removeCount}/${total} similar`
+        : approveCount > removeCount
+        ? `Team approved ${approveCount}/${total} similar`
+        : `Split: ${removeCount} removed, ${approveCount} approved`;
+
+      try {
+        await reddit.addModNote({
+          subreddit: subredditName,
+          user: 'be-hive',
+          note: `🐝 BeHive Precedent: ${verdict}. Report: ${input.reason || 'none'}`,
+          label: 'HELPFUL_USER',
+          redditId: commentId as `t1_${string}`,
+        });
+      } catch {
+        console.log(`[BeHive] Could not add mod note for ${commentId}`);
+      }
+    }
+
+    return c.json<TriggerResponse>({ status: 'ok' });
+  } catch (e) {
+    console.error('[BeHive] onCommentReport error:', e);
+    return c.json<TriggerResponse>({ status: 'ok' });
+  }
+});

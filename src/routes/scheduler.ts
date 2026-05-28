@@ -266,3 +266,78 @@ Based on these decisions, describe in 2-3 sentences how this mod team interprets
 
   return c.json<TaskResponse>({ status: 'ok' });
 });
+
+
+/**
+ * Weekly Digest — Runs every Monday at 9am
+ * Posts a summary to the subreddit so mods see their progress in the feed.
+ */
+scheduler.post('/weekly-digest', async (c) => {
+  let subredditName: string;
+  try {
+    const sub = await reddit.getCurrentSubreddit();
+    subredditName = sub.name;
+  } catch {
+    return c.json<TaskResponse>({ status: 'ok' });
+  }
+
+  try {
+    const alignment = await redis.hGetAll(`alignment:${subredditName}`);
+    const calCount = await redis.get(`calibration-count:${subredditName}`);
+    const modList = await redis.hGetAll(`modlist:${subredditName}`);
+    const streak = await redis.get(`streak:${subredditName}`);
+
+    const score = alignment?.overallScore || '0';
+    const status = alignment?.status || 'learning';
+    const totalDecisions = alignment?.totalDecisions || '0';
+    const modCount = modList ? Object.keys(modList).length : 0;
+
+    // Don't post if still learning
+    if (status === 'learning' || parseInt(totalDecisions) < 10) {
+      return c.json<TaskResponse>({ status: 'ok' });
+    }
+
+    const scoreNum = parseInt(score);
+    const streakNum = parseInt(streak || '0');
+
+    let emoji: string;
+    if (scoreNum >= 90) emoji = '🟢';
+    else if (scoreNum >= 75) emoji = '🟡';
+    else if (scoreNum >= 60) emoji = '🟠';
+    else emoji = '🔴';
+
+    const digestBody = [
+      `# 🐝 BeHive Weekly Digest`,
+      ``,
+      `## ${emoji} Team Alignment: ${score}%`,
+      ``,
+      `| Metric | Value |`,
+      `|---|---|`,
+      `| Decisions this week | ${totalDecisions} |`,
+      `| Active mods | ${modCount} |`,
+      `| Calibration moments | ${calCount || '0'} |`,
+      `| Alignment streak | ${streakNum > 0 ? `🔥 ${streakNum} hours` : 'Not active'} |`,
+      ``,
+      scoreNum >= 85
+        ? `✨ **Great work!** Your team is highly aligned this week.`
+        : scoreNum >= 70
+        ? `👍 **Good alignment.** A few calibration moments to review in the dashboard.`
+        : `⚠️ **Needs attention.** Your team had significant disagreements this week. Check the BeHive dashboard for details.`,
+      ``,
+      `---`,
+      `*Right-click any post → "See Team Precedent" to check how your team handles similar content.*`,
+    ].join('\n');
+
+    await reddit.submitPost({
+      subredditName,
+      title: `🐝 BeHive Weekly: ${score}% aligned | ${totalDecisions} decisions | ${modCount} mods`,
+      text: digestBody,
+    });
+
+    console.log(`[BeHive] Weekly digest posted for r/${subredditName}`);
+  } catch (e) {
+    console.error('[BeHive] Weekly digest error:', e);
+  }
+
+  return c.json<TaskResponse>({ status: 'ok' });
+});

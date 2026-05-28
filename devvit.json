@@ -1,122 +1,149 @@
 {
-  "name": "be-hive",
-  "post": {
-    "dir": "dist/client",
-    "entrypoints": {
-      "default": {
-        "entry": "index.html"
-      }
-    }
-  },
-  "server": {
-    "dir": "dist/server",
-    "entry": "index.cjs"
-  },
-  "menu": {
-    "items": [
-      {
-        "label": "See Team Precedent",
-        "description": "How has your team handled similar content before?",
-        "location": ["post", "comment"],
-        "forUserType": "moderator",
-        "endpoint": "/internal/menu/show-precedent"
-      },
-      {
-        "label": "Flag for Calibration",
-        "description": "Mark this as a case the team should discuss",
-        "location": ["post", "comment"],
-        "forUserType": "moderator",
-        "endpoint": "/internal/menu/flag-calibration"
-      },
-      {
-        "label": "View Team Alignment",
-        "description": "See how consistently your mod team makes decisions",
-        "location": "subreddit",
-        "forUserType": "moderator",
-        "endpoint": "/internal/menu/view-alignment"
-      },
-      {
-        "label": "Create BeHive Dashboard",
-        "description": "Pin a live dashboard post showing team alignment",
-        "location": "subreddit",
-        "forUserType": "moderator",
-        "endpoint": "/internal/menu/create-dashboard"
-      }
-    ]
-  },
-  "forms": {
-    "precedentResult": "/internal/form/precedent-result",
-    "alignmentResult": "/internal/form/alignment-result"
-  },
-  "triggers": {
-    "onAppInstall": "/internal/triggers/on-app-install",
-    "onModAction": "/internal/triggers/on-mod-action",
-    "onPostDelete": "/internal/triggers/on-post-delete",
-    "onCommentDelete": "/internal/triggers/on-comment-delete"
-  },
-  "scheduler": {
-    "tasks": {
-      "compute-alignment": {
-        "endpoint": "/internal/scheduler/compute-alignment",
-        "cron": "0 * * * *"
-      },
-      "detect-calibrations": {
-        "endpoint": "/internal/scheduler/detect-calibrations",
-        "cron": "*/30 * * * *"
-      },
-      "generate-interpretations": {
-        "endpoint": "/internal/scheduler/generate-interpretations",
-        "cron": "0 3 * * 0"
-      }
-    }
-  },
-  "scripts": {
-    "build": "vite build",
-    "dev": "vite build --watch"
-  },
-  "permissions": {
-    "reddit": { "enable": true, "scope": "moderator" },
-    "redis": true,
-    "http": {
-      "enable": true,
-      "domains": ["generativelanguage.googleapis.com", "api.openai.com"]
-    }
-  },
-  "settings": {
-    "subreddit": {
-      "llmProvider": {
-        "type": "select",
-        "label": "AI Provider (for rule interpretations)",
-        "options": [
-          { "label": "None (disable AI features)", "value": "none" },
-          { "label": "Google Gemini", "value": "gemini" },
-          { "label": "OpenAI", "value": "openai" }
-        ],
-        "defaultValue": "none"
-      },
-      "llmApiKey": {
-        "type": "string",
-        "label": "AI API Key (from aistudio.google.com or platform.openai.com)",
-        "defaultValue": ""
-      },
-      "enableCalibrationAlerts": {
-        "type": "boolean",
-        "label": "Detect and surface calibration moments (mod disagreements)",
-        "defaultValue": true
-      },
-      "minDecisionsForPrecedent": {
-        "type": "number",
-        "label": "Minimum past decisions before showing precedent",
-        "defaultValue": 5
-      },
-      "enableAutoInterpretations": {
-        "type": "boolean",
-        "label": "Generate weekly AI rule interpretations",
-        "defaultValue": true
-      }
-    }
-  },
-  "marketingAssets": {
-    "icon": "icon.png"
-  }
+    "name":  "be-hive",
+    "post":  {
+                 "dir":  "dist/client",
+                 "entrypoints":  {
+                                     "default":  {
+                                                     "entry":  "index.html"
+                                                 }
+                                 }
+             },
+    "server":  {
+                   "dir":  "dist/server",
+                   "entry":  "index.cjs"
+               },
+    "menu":  {
+                 "items":  [
+                               {
+                                   "label":  "See Team Precedent",
+                                   "description":  "How has your team handled similar content before?",
+                                   "location":  [
+                                                    "post",
+                                                    "comment"
+                                                ],
+                                   "forUserType":  "moderator",
+                                   "endpoint":  "/internal/menu/show-precedent"
+                               },
+                               {
+                                   "label":  "Flag for Calibration",
+                                   "description":  "Mark this as a case the team should discuss",
+                                   "location":  [
+                                                    "post",
+                                                    "comment"
+                                                ],
+                                   "forUserType":  "moderator",
+                                   "endpoint":  "/internal/menu/flag-calibration"
+                               },
+                               {
+                                   "label":  "View Team Alignment",
+                                   "description":  "See how consistently your mod team makes decisions",
+                                   "location":  "subreddit",
+                                   "forUserType":  "moderator",
+                                   "endpoint":  "/internal/menu/view-alignment"
+                               },
+                               {
+                                   "label":  "Create BeHive Dashboard",
+                                   "description":  "Pin a live dashboard post showing team alignment",
+                                   "location":  "subreddit",
+                                   "forUserType":  "moderator",
+                                   "endpoint":  "/internal/menu/create-dashboard"
+                               }
+                           ]
+             },
+    "forms":  {
+                  "precedentResult":  "/internal/form/precedent-result",
+                  "alignmentResult":  "/internal/form/alignment-result"
+              },
+    "triggers":  {
+                     "onAppInstall":  "/internal/triggers/on-app-install",
+                     "onModAction":  "/internal/triggers/on-mod-action",
+                     "onPostDelete":  "/internal/triggers/on-post-delete",
+                     "onCommentDelete":  "/internal/triggers/on-comment-delete",
+                     "onPostReport":  "/internal/triggers/on-post-report",
+                     "onCommentReport":  "/internal/triggers/on-comment-report"
+                 },
+    "scheduler":  {
+                      "tasks":  {
+                                    "compute-alignment":  {
+                                                              "endpoint":  "/internal/scheduler/compute-alignment",
+                                                              "cron":  "0 * * * *"
+                                                          },
+                                    "detect-calibrations":  {
+                                                                "endpoint":  "/internal/scheduler/detect-calibrations",
+                                                                "cron":  "*/30 * * * *"
+                                                            },
+                                    "generate-interpretations":  {
+                                                                     "endpoint":  "/internal/scheduler/generate-interpretations",
+                                                                     "cron":  "0 3 * * 0"
+                                                                 },
+                                    "weekly-digest":  {
+                                                          "cron":  "0 9 * * 1",
+                                                          "endpoint":  "/internal/scheduler/weekly-digest"
+                                                      }
+                                }
+                  },
+    "scripts":  {
+                    "build":  "vite build",
+                    "dev":  "vite build --watch"
+                },
+    "permissions":  {
+                        "reddit":  {
+                                       "enable":  true,
+                                       "scope":  "moderator"
+                                   },
+                        "redis":  true,
+                        "http":  {
+                                     "enable":  true,
+                                     "domains":  [
+                                                     "generativelanguage.googleapis.com",
+                                                     "api.openai.com"
+                                                 ]
+                                 }
+                    },
+    "settings":  {
+                     "subreddit":  {
+                                       "llmProvider":  {
+                                                           "type":  "select",
+                                                           "label":  "AI Provider (for rule interpretations)",
+                                                           "options":  [
+                                                                           {
+                                                                               "label":  "None (disable AI features)",
+                                                                               "value":  "none"
+                                                                           },
+                                                                           {
+                                                                               "label":  "Google Gemini",
+                                                                               "value":  "gemini"
+                                                                           },
+                                                                           {
+                                                                               "label":  "OpenAI",
+                                                                               "value":  "openai"
+                                                                           }
+                                                                       ],
+                                                           "defaultValue":  "none"
+                                                       },
+                                       "llmApiKey":  {
+                                                         "type":  "string",
+                                                         "label":  "AI API Key (from aistudio.google.com or platform.openai.com)",
+                                                         "defaultValue":  ""
+                                                     },
+                                       "enableCalibrationAlerts":  {
+                                                                       "type":  "boolean",
+                                                                       "label":  "Detect and surface calibration moments (mod disagreements)",
+                                                                       "defaultValue":  true
+                                                                   },
+                                       "minDecisionsForPrecedent":  {
+                                                                        "type":  "number",
+                                                                        "label":  "Minimum past decisions before showing precedent",
+                                                                        "defaultValue":  5
+                                                                    },
+                                       "enableAutoInterpretations":  {
+                                                                         "type":  "boolean",
+                                                                         "label":  "Generate weekly AI rule interpretations",
+                                                                         "defaultValue":  true
+                                                                     }
+                                   }
+                 },
+    "marketingAssets":  {
+                            "icon":  "icon.png"
+                        }
 }
